@@ -1,31 +1,31 @@
 /**
-  Write me...
- 
-  @class AnimatedContainerView
-  @namespace Ember
-  @extends Ember.ContainerView
-*/
+ Write me...
+
+ @class AnimatedContainerView
+ @namespace Ember
+ @extends Ember.ContainerView
+ */
 Ember.AnimatedContainerView = Ember.ContainerView.extend({
 
     classNames: ['ember-animated-container'],
-    
-    init: function() {
+
+    init: function () {
         this._super();
         //Register this view, so queued effects can be related with this view by name
         Ember.AnimatedContainerView._views[this.get('name')] = this;
         this._isAnimating = false;
     },
-    
-    willDestroy: function() {
+
+    willDestroy: function () {
         this._super();
         //Clean up
         var name = this.get('name');
         delete Ember.AnimatedContainerView._views[name];
         delete Ember.AnimatedContainerView._animationQueue[name];
     },
-    
+
     //Override parent method
-    _currentViewWillChange: Ember.beforeObserver(function() {
+    _currentViewWillChange: Ember.beforeObserver(function () {
         var currentView = Ember.get(this, 'currentView');
         if (currentView) {
             //Store the old `currentView` (and don't destroy it yet) so we can use it for animation later
@@ -33,7 +33,7 @@ Ember.AnimatedContainerView = Ember.ContainerView.extend({
         }
     }, 'currentView'),
 
-    _currentViewDidChange: Ember.observer(function() {
+    _currentViewDidChange: Ember.observer(function () {
         var newView = Ember.get(this, 'currentView'),
             oldView = Ember.get(this, 'oldView'),
             name = this.get('name'),
@@ -46,7 +46,7 @@ Ember.AnimatedContainerView = Ember.ContainerView.extend({
                 effect = Ember.AnimatedContainerView._animationQueue[name];
                 delete Ember.AnimatedContainerView._animationQueue[name];
                 if (effect && !Ember.AnimatedContainerView._effects[effect]) {
-                    Ember.warn('Unknown animation effect: '+effect);
+                    Ember.warn('Unknown animation effect: ' + effect);
                     effect = null;
                 }
                 //Forget about the old view
@@ -67,7 +67,7 @@ Ember.AnimatedContainerView = Ember.ContainerView.extend({
         }
     }, 'currentView'),
 
-    _handleAnimationQueue: function() {
+    _handleAnimationQueue: function () {
         //If animation is in progress, just stop here. Once the animation has finished, this method will be called again.
         if (this._isAnimating) {
             return;
@@ -84,12 +84,13 @@ Ember.AnimatedContainerView = Ember.ContainerView.extend({
             if (oldView && effect) {
                 //If an effect is queued, then start the effect when the new view has been inserted in the DOM
                 this._isAnimating = true;
-                newView.on('didInsertElement', function() {
-                    Ember.AnimatedContainerView._effects[effect](self, newView, oldView, function() {
-                        Em.run(function() {
+                newView.on('didInsertElement', function () {
+                    Ember.AnimatedContainerView._effects[effect](self, newView, oldView, function () {
+                        Em.run(function () {
                             self.removeObject(oldView);
                             oldView.destroy();
                             //Check to see if there are any queued animations
+                            effect.resolve(effect, newView, oldView);
                             self._isAnimating = false;
                             self._handleAnimationQueue();
                         });
@@ -105,11 +106,11 @@ Ember.AnimatedContainerView = Ember.ContainerView.extend({
         }
     },
 
-    enqueueAnimation: function(effect) {
+    enqueueAnimation: function (effect) {
         Ember.AnimatedContainerView._animationQueue[this.get('name')] = effect;
     },
-    
-    setCurrentViewAnimated: function(currentView, effect) {
+
+    setCurrentViewAnimated: function (currentView, effect) {
         this.enqueueAnimation(effect);
         this.set('currentView', currentView);
     }
@@ -117,57 +118,64 @@ Ember.AnimatedContainerView = Ember.ContainerView.extend({
 });
 
 Ember.AnimatedContainerView.reopenClass({
-    
+
     /**
-      All animated outlets registers itself in this hash
-       
-      @private
-      @property {Object} _views
-    */
+     All animated outlets registers itself in this hash
+
+     @private
+     @property {Object} _views
+     */
     _views: {},
 
     /**
-      Whenever an animated route transition is set in motion, it will be stored here, so the animated outlet view can pick it up
+     Whenever an animated route transition is set in motion, it will be stored here, so the animated outlet view can pick it up
 
-      @private
-      @property {Object} _animationQueue
-    */
+     @private
+     @property {Object} _animationQueue
+     */
     _animationQueue: {},
 
     /**
-      Enqueue effects to be executed by the given outlets when the next route transition happens.
-      
-      @param {Object} animations A hash with keys corresponding to outlet views and values with the desired animation effect.
-    */
-    enqueueAnimations: function(animations) {
+     Enqueue effects to be executed by the given outlets when the next route transition happens.
+
+     @param {Object} animations A hash with keys corresponding to outlet views and values with the desired animation effect.
+     */
+    enqueueAnimations: function (animations) {
+        var promises = [];
+
         for (var name in animations) {
             if (!animations.hasOwnProperty(name)) continue;
+
+            promises.push(animations[name].promise = new Ember.RSVP.Promise(function (resolve, reject) {}));
+
             this._animationQueue[name] = animations[name];
         }
+
+        return promises;
     },
 
     /**
-      All animation effects are stored on this object and can be referred to by its key
+     All animation effects are stored on this object and can be referred to by its key
 
-      @private
-      @property {Object} effects
-    */
+     @private
+     @property {Object} effects
+     */
     _effects: {},
 
 
     /**
-      Register a new effect.
-     
-      The `callback` function will be passed the following parameters:
-     
-      - The `Ember.AnimatedContainerView` instance.
-      - The new view.
-      - The old view.
+     Register a new effect.
 
-      @param {String} effect The name of the effect, e.g. 'slideLeft'
-      @param {Function} callback The function to call when effect has to be executed
-    */
-    registerEffect: function(effect, callback) {
+     The `callback` function will be passed the following parameters:
+
+     - The `Ember.AnimatedContainerView` instance.
+     - The new view.
+     - The old view.
+
+     @param {String} effect The name of the effect, e.g. 'slideLeft'
+     @param {Function} callback The function to call when effect has to be executed
+     */
+    registerEffect: function (effect, callback) {
         this._effects[effect] = callback;
     }
 
