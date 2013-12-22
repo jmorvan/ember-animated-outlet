@@ -11,15 +11,9 @@ Ember.Route.reopen({
       @param model
     */
     transitionToAnimated: function(name, animations, model) {
-
-        var promises = Ember.AnimatedContainerView.enqueueAnimations(animations);
+        Ember.AnimatedContainerView.enqueueAnimations(animations);
         Array.prototype.splice.call(arguments, 1, 1);
-
-        var ret = this.transitionTo.apply(this, arguments);
-
-        $.extend(ret, {animations:Ember.RSVP.all(promises)})
-
-        return  ret;
+        return this.transitionTo.apply(this, arguments);
     },
 
     /**
